@@ -94,7 +94,7 @@ std::string ShaderProgram::getShaderFromFile(const char *fileName)
     }
     else
     {
-        std::cout << "okunmadi";
+        std::cout << " okunmadi";
     }
 
     return data;

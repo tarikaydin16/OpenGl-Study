@@ -16,6 +16,7 @@ set(PROJECT_SOURCE_DIR ${PROJECT_DIR}/src)
 set(PROJECT_SOURCES 
                 ${PROJECT_SOURCE_DIR}/glad.c
                 ${PROJECT_SOURCE_DIR}/shaderprogram.cpp
+                ${PROJECT_SOURCE_DIR}/square.cpp
                 ${PROJECT_SOURCE_DIR}/main.cpp
                 )
 

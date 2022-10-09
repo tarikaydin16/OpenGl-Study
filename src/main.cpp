@@ -3,10 +3,14 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/vec3.hpp>
-
+#include <thread> // std::this_thread::sleep_for
+#include <chrono>
+#include <vector>
+#include "square.hpp"
 #include "shaderprogram.hpp"
 
 float length = 0.08;
+bool isCollide;
 // noktalara ait koordinat bilgileri.
 float vertices[] = {
     -length / 2, length / 2, 0.0f,
@@ -19,15 +23,93 @@ float vertices[] = {
 
 };
 
+std::vector<Square *> snakeList;
+
 // OpenGL nesnelerinin id değerlerini tutacak olan değişkenler
 
 unsigned int VBO;
 unsigned int VAO;
-float deger = 0.0f;
-glm::vec3 position = glm::vec3(1.0f, 0.0f, 0.0f);
-glm::vec4 color1 = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-glm::vec4 color2 = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
-glm::vec4 color3 = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+
+bool isSnakeDead()
+{
+    // Creating the variables for simplicity
+    float headX = snakeList[0]->getPosition().x;
+    float headY = snakeList[0]->getPosition().y;
+
+    for (int i = snakeList.size() - 1; i > 0; i--)
+    {
+        float currentX = snakeList[i]->getPosition().x;
+        float currentY = snakeList[i]->getPosition().y;
+
+        if (headX == currentX && headY == currentY)
+        {
+            // The head collides with the current body part
+            return true;
+        }
+    }
+
+    return false;
+}
+void moveSnake()
+{
+    if (!isCollide)
+        for (auto next : snakeList)
+        {
+            next->move();
+        }
+    for (int i = snakeList.size() - 1; i > 0; i--)
+    {
+        snakeList[i]->setDirection(snakeList[i - 1]->getDirection());
+        if (isSnakeDead())
+        {
+            std::cout << "caripsti";
+            isCollide = true;
+        }
+    }
+}
+
+void drawSnake(ShaderProgram &program) // referans olarak gönderdik
+{
+    for (auto next : snakeList)
+    {
+        program.setVec3("uMove", next->getPosition()); // next adres olduğu için -> kullanarak fonk. çağırıyoruz.
+        program.setVec4("uColor", next->getColor());
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    }
+}
+void addToSnakeTail()
+{
+    int elementCount = snakeList.size();
+    if (elementCount == 0)
+    {
+        snakeList.push_back(new Square(0.0f, 0.0f, length));
+    }
+    else
+    {
+        Square *lastSquare = snakeList[elementCount - 1];
+        glm::vec3 pos = lastSquare->getPosition();
+        Square::DIRECTION dir = lastSquare->getDirection();
+
+        switch (dir)
+        {
+        case Square::DIR_RIGHT:
+            pos -= glm::vec3(length, 0.0f, 0.0f);
+            break;
+        case Square::DIR_LEFT:
+            pos += glm::vec3(length, 0.0f, 0.0f);
+            break;
+        case Square::DIR_UP:
+            pos -= glm::vec3(0.0f, length, 0.0f);
+            break;
+        case Square::DIR_DOWN:
+            pos += glm::vec3(0.0f, length, 0.0f);
+            break;
+        }
+        Square *newSquare = new Square(pos.x, pos.y, length);
+        newSquare->setDirection(dir);
+        snakeList.push_back(newSquare);
+    }
+}
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
@@ -36,14 +118,20 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
         glfwTerminate();
     if (action == GLFW_PRESS)
     {
-        if (key == GLFW_KEY_A)
-            position.x -= length;
-        if (key == GLFW_KEY_D)
-            position.x += length;
-        if (key == GLFW_KEY_S)
-            position.y -= length;
-        if (key == GLFW_KEY_W)
-            position.y += length;
+        if (snakeList.size() != 0)
+        {
+            Square *first = snakeList[0];
+            if (key == GLFW_KEY_A)
+                first->setDirection(Square::DIR_LEFT);
+            if (key == GLFW_KEY_D)
+                first->setDirection(Square::DIR_RIGHT);
+            if (key == GLFW_KEY_S)
+                first->setDirection(Square::DIR_DOWN);
+            if (key == GLFW_KEY_W)
+                first->setDirection(Square::DIR_UP);
+        }
+        if (key == GLFW_KEY_SPACE)
+            addToSnakeTail();
     }
 }
 
@@ -75,6 +163,10 @@ int main(int argc, char **argv)
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
+    addToSnakeTail();
+    addToSnakeTail();
+    addToSnakeTail();
+    addToSnakeTail();
 
     ShaderProgram program;
     program.attachShader("../../ders4/shaders/simplevs.glsl", GL_VERTEX_SHADER);
@@ -111,17 +203,11 @@ int main(int argc, char **argv)
 
         //çizimde kullanılacak olan Vertex array object aktif ediliyor
         glBindVertexArray(VAO);
-        //çizim komutu gönderiliyor
-        program.setVec3("uMove", position);
-        program.setVec4("uColor", color1);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        program.setVec3("uMove", position + glm::vec3(length, 0.0f, 0.0f));
-        program.setVec4("uColor", color2);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        program.setVec3("uMove", position + glm::vec3(0.0f, length, 0.0f));
-        program.setVec4("uColor", color3);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
 
+        drawSnake(program);
+        moveSnake();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(70));
         glfwSwapBuffers(window);
 
         glfwPollEvents();
